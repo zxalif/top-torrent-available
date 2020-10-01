@@ -13,7 +13,8 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QAbstractScrollArea,
-    QHeaderView
+    QHeaderView,
+    QMessageBox,
 )
 
 from PyQt5.QtGui import (
@@ -25,8 +26,7 @@ from PyQt5 import QtGui
 from PyQt5 import QtCore
 
 from PyQt5.QtCore import QEvent, Qt
-from PyQt5.QtWidgets import QMessageBox
-from torrent import get_top_movies, get_trending_movies
+from libs.torrent import get_top_movies, get_trending_movies
 
 
 try:
