@@ -39,15 +39,26 @@ try:
 except ImportError:
     DUMMY = []
 
-DEBUG = False
+DEBUG = True
 COUNT_LABEL = 'Count: %d'
 CONNECT_CHECK_INTERVAL = 3600  # (s) - every hour
 PAUSE = False
 CHECK_SAFE_SCREEN = True
+WIDTH = 350
+HEIGHT = 450
+SIZE = (WIDTH, HEIGHT)
 
 
 def get_uuid_16(length=16):
     return uuid4().hex[:16]
+
+
+def set_to_bottom_right_corner(self):
+    ag = QDesktopWidget().availableGeometry()
+    # sg = QDesktopWidget().screenGeometry()
+    x = ag.width()
+    y = ag.height()
+    self.move(x, y)
 
 
 class WorkerThread(QtCore.QThread):
@@ -134,6 +145,59 @@ class WidgetWindow(QtWidgets.QMainWindow):
         self.gotoSignal.emit(name)
 
 
+class ContentDetailsWindow(WidgetWindow):
+    windowName = 'details'
+
+    def __init__(self, parent=None):
+        super(WidgetWindow, self).__init__(parent)
+        self.parent = parent
+        self.central_widgets = QWidget()
+        self.setWindowTitle('+?')
+        self.UIComponents()
+
+    def UIComponents(self):
+        back_icon = qta.icon('fa5.arrow-alt-circle-left')
+        self.back_button = QPushButton(back_icon, "")
+        self.back_button.clicked.connect(lambda: self.goto('main'))
+
+        copy_icon = qta.icon('fa5.copy')
+        self.copy_magnet = QPushButton(copy_icon, "")
+        open_icon = qta.icon('fa5s.external-link-square-alt')
+        self.open_button = QPushButton(open_icon, "")
+
+        bottom_button_layout = QHBoxLayout()
+        bottom_button_layout.addWidget(self.back_button)
+        bottom_button_layout.addStretch(1)
+        bottom_button_layout.addWidget(self.copy_magnet)
+        bottom_button_layout.addWidget(self.open_button)
+
+        main_box_layout = QVBoxLayout()
+        main_box_layout.addStretch(1)
+        main_box_layout.addLayout(bottom_button_layout, 1)
+        self.central_widgets.setLayout(main_box_layout)
+        self.setCentralWidget(self.central_widgets)
+
+    def keyPressEvent(self, event):
+        if event.key() in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Escape):
+            self.goto('main')
+        else:
+            super().keyPressEvent(event)
+
+
+class TableContentWidget(QTableWidget):
+
+    def __init__(self, parent=None):
+        super(TableContentWidget, self).__init__()
+        self.parent = parent
+
+    def keyPressEvent(self, event):
+        # pretttty close both keys
+        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Return):
+            self.parent.goto('details')
+        else:
+            super().keyPressEvent(event)
+
+
 class MainWindow(WidgetWindow):
     windowName = 'main'
     headers = [
@@ -154,7 +218,6 @@ class MainWindow(WidgetWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Trending/Top Torrent")
 
         # download thread
         self.threads = [DownloadThread(func, dtype=dtype) for dtype, func in self.thread_safe_func.items()]
@@ -186,8 +249,8 @@ class MainWindow(WidgetWindow):
         self.connection.setStyleSheet("background-color: blue")
         self.connection.setToolTip("Internet Connection")
         self.counter_label = QLabel(COUNT_LABEL % 0)
-        refresh = qta.icon('fa5.arrow-alt-circle-down')
-        refresh_button = QPushButton(refresh, "Refresh")
+        refresh = qta.icon('fa5s.sync-alt')
+        refresh_button = QPushButton(refresh, "")
         refresh_button.clicked.connect(self.refresh)
 
         # progress widget
@@ -195,7 +258,7 @@ class MainWindow(WidgetWindow):
         self.progress.setAlignment(Qt.AlignCenter)
 
         # main contents
-        self.content = QTableWidget()
+        self.content = TableContentWidget(self)
         self.content.setColumnCount(len(self.headers))
         self.content.verticalHeader().setVisible(False)
         self.content.setHorizontalHeaderLabels(self.headers)
@@ -234,13 +297,12 @@ class MainWindow(WidgetWindow):
         self.connection_thread.start()
 
     def update_row(self, cell_no, data):
-        url = 'https://127.0.0.1:8000'
         for index, key in enumerate(self.headers):
             self.content.setItem(
                 cell_no,
                 index,
                 QTableWidgetItem(
-                    data.get(key, url)
+                    data.get(key, '-')
                 )
             )
 
@@ -259,8 +321,8 @@ class MainWindow(WidgetWindow):
                     count = self.content.rowCount()
                 count -= 1
 
-    def _update_counter_label(self, count):
-        label = str(COUNT_LABEL % count)
+    def update_counter_label(self):
+        label = str(COUNT_LABEL % self.content.rowCount())
         self.counter_label.setText(label)
 
     def update_screen(self, data, dtype):
@@ -281,7 +343,7 @@ class MainWindow(WidgetWindow):
             item.update({'dtype': dtype})
             self.update_row(previous_count + i, item)
 
-        self._update_counter_label(max_length)
+        self.update_counter_label()
 
         self.turn_off_progress()
 
@@ -301,9 +363,10 @@ class Window(QMainWindow):
         self.stacked_widget = QtWidgets.QStackedWidget()
         self.setCentralWidget(self.stacked_widget)
 
+        self.setWindowTitle("Trending/Top Torrent")
         self.frames = {}
 
-        self.setFixedSize(350, 450)
+        self.setFixedSize(*SIZE)
         self.set_to_bottom_right_corner()
 
         self.tray_icon = SystemTrayIcon(QtGui.QIcon('img/tray.png'), self)
@@ -315,6 +378,7 @@ class Window(QMainWindow):
 
         # register all widgets
         self.register(MainWindow())
+        self.register(ContentDetailsWindow(self))
 
         self.goto('main')
 
@@ -337,7 +401,6 @@ class Window(QMainWindow):
         if name in self.frames:
             widget = self.frames[name]
             self.stacked_widget.setCurrentWidget(widget)
-            self.setWindowTitle(widget.windowTitle())
 
     # on change Event (minimized/maximized)
     def changeEvent(self, event):
@@ -352,6 +415,10 @@ class Window(QMainWindow):
             return
         self.hide()
         event.ignore()
+
+    @property
+    def content(self):
+        return self.frames['main'].content
 
 
 if __name__ == '__main__':
