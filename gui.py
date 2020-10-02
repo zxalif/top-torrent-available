@@ -144,7 +144,7 @@ class MainWindow(WidgetWindow):
         'le',
         'time',
         'size',
-        '?',
+        'url',
     ]
 
     thread_safe_func = {
@@ -154,7 +154,6 @@ class MainWindow(WidgetWindow):
 
     def __init__(self):
         super().__init__()
-        self._data = DUMMY if DEBUG else []
         self.setWindowTitle("Trending/Top Torrent")
 
         # download thread
@@ -201,6 +200,8 @@ class MainWindow(WidgetWindow):
         self.content.verticalHeader().setVisible(False)
         self.content.setHorizontalHeaderLabels(self.headers)
         self.content.resizeColumnsToContents()
+        self.content.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        self.content.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.content.hide()
 
         top_content_layout = QVBoxLayout()
@@ -282,8 +283,6 @@ class MainWindow(WidgetWindow):
 
         self._update_counter_label(max_length)
 
-        self.content.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
-        self.content.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.turn_off_progress()
 
     def turn_on_progress(self):

@@ -21,6 +21,7 @@ def extract(soup):
     data = []
     for tr in trs:
         name = tr.find('td', {'class': 'name'})
+        url = name.find('a')['href']
         name = name.text.split('\n')[-1]
         size = tr.find('td', {'class': 'size'}).text
         seeds = tr.find('td', {'class': 'seeds'}).text
@@ -34,6 +35,7 @@ def extract(soup):
             le=leeches,
             time=coll_date,
             type='movie',
+            url=url,
         ))
 
     return data
