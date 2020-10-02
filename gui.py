@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QAbstractScrollArea,
     QHeaderView,
     QMessageBox,
+    QLabel,
 )
 
 from PyQt5.QtGui import (
@@ -27,6 +28,8 @@ from PyQt5 import QtCore
 
 from PyQt5.QtCore import QEvent, Qt
 from libs.torrent import get_top_movies, get_trending_movies
+from datetime import timedelta, datetime
+from uuid import uuid4
 
 
 try:
@@ -35,6 +38,73 @@ except ImportError:
     DUMMY = []
 
 DEBUG = False
+COUNT_LABEL = 'Count: %d'
+CONNECT_CHECK_INTERVAL = 300  # (s) - every 5 minute
+PAUSE = False
+CHECK_SAFE_SCREEN = True
+
+
+def check_connection():
+    pass
+
+
+def get_uuid_16(length=16):
+    return uuid4().hex[:16]
+
+
+class WorkerThread(QtCore.QThread):
+
+    def __init__(self, func, parent=None, *args, **kwargs):
+        super(WorkerThread, self).__init__(parent)
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+
+
+class DownloadThread(WorkerThread):
+    job_done = QtCore.pyqtSignal(object, 'QString')
+
+    def run(self):
+        data = self.func()
+        dtype = self.kwargs.get('dtype', '-')
+        self.job_done.emit(data, dtype)
+
+
+class MemCache:
+
+    _mem = {}
+
+    @classmethod
+    def update(self, data):
+        MemCache.update(data)
+
+    @classmethod
+    def get(self, key):
+        return MemCache.get(key)
+
+
+class KeepAlive(WorkerThread):
+
+    signal = QtCore.pyqtSignal(object)
+
+    def __init__(self, func, connector, interval=0.1, parent=None, *args, **kwargs):
+        super(KeepAlive, self).init(func, parent, *args, **kwargs)
+        self._interval = interval
+        self.connector = connector
+        self._id = get_uuid_16()
+        self._break = False
+
+    def run(self):
+        self._last_check = now = datetime.now()
+
+        if now >= now + timedelta(seconds=self._interval):
+            data = self.func()
+            self.signal.emit(data)
+
+        if not self._break:
+            ka = KeepAlive(self.func, self._interval, self.parent, *self.args, **self.kwargs)
+            ka.signal.connect(self.connector)
+            ka.start()
 
 
 class SystemTrayIcon(QSystemTrayIcon):
@@ -89,6 +159,7 @@ class MainWindow(WidgetWindow):
     windowName = 'main'
     headers = [
         'name',
+        'dtype',
         'type',
         'se',
         'le',
@@ -97,10 +168,18 @@ class MainWindow(WidgetWindow):
         '?',
     ]
 
+    thread_safe_func = {
+        'thrending': get_trending_movies,
+        'top': get_top_movies,
+    }
+
     def __init__(self):
         super().__init__()
         self._data = DUMMY if DEBUG else []
         self.setWindowTitle("Trending/Top Torrent")
+
+        self.threads = [DownloadThread(func, dtype=dtype) for dtype, func in self.thread_safe_func.items()]
+        for thread in self.threads: thread.job_done.connect(self.update_screen)
 
         self.initUI()
 
@@ -112,12 +191,13 @@ class MainWindow(WidgetWindow):
         # choice the one
 
         # refresh button
+        self.counter_label = QLabel(COUNT_LABEL % 0)
         refresh_button = QPushButton("Refresh")
         refresh_button.clicked.connect(self.refresh)
 
         # main contents
         self.content = QTableWidget()
-        self.content.setColumnCount(6)
+        self.content.setColumnCount(len(self.headers))
         self.content.verticalHeader().setVisible(False)
         self.content.setHorizontalHeaderLabels(self.headers)
         self.content.resizeColumnsToContents()
@@ -127,34 +207,23 @@ class MainWindow(WidgetWindow):
 
         bottom_button_layout = QHBoxLayout()
         bottom_button_layout.addStretch(1)
+        bottom_button_layout.addWidget(self.counter_label)
         bottom_button_layout.addWidget(refresh_button)
 
         main_box_layout = QVBoxLayout()
         main_box_layout.addLayout(top_content_layout, 1)
         main_box_layout.addLayout(bottom_button_layout, 2)
 
-        self.update_table()
         self.central_widgets.setLayout(main_box_layout)
         self.setCentralWidget(self.central_widgets)
 
+        # lets download the data
+        self.refresh()
+
     # refresh the current window
     def refresh(self):
-        self.update_table()
-
-    def get_data(self, force=False):
-        return self.data
-
-    @property
-    def data(self):
-
-        # try refreshing after 10 minute or an hour
-        # ForceTabbedDocks
-
-        if DEBUG: return self._data
-        top_ = get_top_movies()
-        trending_ = get_trending_movies()
-        self._data = top_ + trending_
-        return self._data
+        for thread in self.threads:
+            thread.start()
 
     def update_row(self, cell_no, data):
         url = 'https://127.0.0.1:8000'
@@ -167,17 +236,31 @@ class MainWindow(WidgetWindow):
                 )
             )
 
-    def _clear_table(self):
-        while self.content.rowCount() > 0:
-            self.content.removeRow(0)
+    def _clear_table(self, **kwargs):
+        if kwargs.get('force', False):
+            while self.content.rowCount() > 0:
+                self.content.removeRow(0)
+        if kwargs.get('dtype'):
+            dtype = kwargs['dtype']
+            print(dtype)
+            # remote all similler dtype data from table
 
-    def update_table(self):
-        self._clear_table()
+    def _update_counter_label(self, count):
+        label = str(COUNT_LABEL % count)
+        self.counter_label.setText(label)
+
+    def update_screen(self, data, dtype):
+        self._clear_table(dtype=dtype)
+        previous_count = self.content.rowCount()
+        data_count = len(data)
         self.content.setRowCount(
-            len(self.data)
+            previous_count + data_count
         )
-        for i, item in enumerate(self.data):
-            self.update_row(i, item)
+        for i, item in enumerate(data):
+            item.update({'dtype': dtype})
+            self.update_row(previous_count + i, item)
+
+        self._update_counter_label(previous_count + data_count)
 
         self.content.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         self.content.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
@@ -246,7 +329,8 @@ class Window(QMainWindow):
         event.ignore()
 
 
-app = QApplication(sys.argv)
-window = Window()
-if DEBUG: window.show()
-sys.exit(app.exec_())
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = Window()
+    if DEBUG: window.show()
+    sys.exit(app.exec_())
