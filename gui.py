@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QMessageBox,
     QLabel,
+    QStyle,
 )
 
 from PyQt5.QtGui import (
@@ -30,6 +31,9 @@ from PyQt5.QtCore import QEvent, Qt
 from libs.torrent import get_top_movies, get_trending_movies
 from datetime import timedelta, datetime
 from uuid import uuid4
+import qtawesome as qta
+import requests
+import time
 
 
 try:
@@ -70,17 +74,35 @@ class DownloadThread(WorkerThread):
         self.job_done.emit(data, dtype)
 
 
+class ConnectionThread(QtCore.QThread):
+    signal = QtCore.pyqtSignal(bool)
+
+    def __init__(self, parent=None):
+        super(ConnectionThread, self).__init__(parent)
+
+    def run(self):
+        cfm = False
+        while True:
+            try:
+                requests.get("https://api.myip.com/")
+                cfm = True
+            except requests.exceptions.ConnectionError:
+                cfm = False
+            self.signal.emit(cfm)
+            time.sleep(CONNECT_CHECK_INTERVAL)
+
+
 class MemCache:
 
     _mem = {}
 
     @classmethod
     def update(self, data):
-        MemCache.update(data)
+        MemCache._mem.update(data)
 
     @classmethod
-    def get(self, key):
-        return MemCache.get(key)
+    def get(self, key, default=None):
+        return MemCache._mem.get(key, default)
 
 
 class KeepAlive(WorkerThread):
@@ -88,7 +110,7 @@ class KeepAlive(WorkerThread):
     signal = QtCore.pyqtSignal(object)
 
     def __init__(self, func, connector, interval=0.1, parent=None, *args, **kwargs):
-        super(KeepAlive, self).init(func, parent, *args, **kwargs)
+        super(KeepAlive, self).__init__(func, parent, *args, **kwargs)
         self._interval = interval
         self.connector = connector
         self._id = get_uuid_16()
@@ -178,8 +200,13 @@ class MainWindow(WidgetWindow):
         self._data = DUMMY if DEBUG else []
         self.setWindowTitle("Trending/Top Torrent")
 
+        # download thread
         self.threads = [DownloadThread(func, dtype=dtype) for dtype, func in self.thread_safe_func.items()]
         for thread in self.threads: thread.job_done.connect(self.update_screen)
+
+        # connection check threads
+        self.connection_thread = ConnectionThread()
+        self.connection_thread.signal.connect(self.update_connection_status)
 
         self.initUI()
 
@@ -187,10 +214,21 @@ class MainWindow(WidgetWindow):
         self.central_widgets = QWidget()
         self.UIComponents()
 
+    def update_connection_status(self, has_connection):
+        if not has_connection:
+            self.connection.setStyleSheet("background-color: red")
+
+        if has_connection:
+            self.connection.setStyleSheet("background-color: green")
+
     def UIComponents(self):
         # choice the one
 
         # refresh button
+        eye_connect = qta.icon('fa5.eye')
+        self.connection = QPushButton(eye_connect, "")
+        self.connection.setStyleSheet("background-color: blue")
+        self.connection.setToolTip("Internet Connection")
         self.counter_label = QLabel(COUNT_LABEL % 0)
         refresh_button = QPushButton("Refresh")
         refresh_button.clicked.connect(self.refresh)
@@ -208,6 +246,7 @@ class MainWindow(WidgetWindow):
         bottom_button_layout = QHBoxLayout()
         bottom_button_layout.addStretch(1)
         bottom_button_layout.addWidget(self.counter_label)
+        bottom_button_layout.addWidget(self.connection)
         bottom_button_layout.addWidget(refresh_button)
 
         main_box_layout = QVBoxLayout()
@@ -224,6 +263,9 @@ class MainWindow(WidgetWindow):
     def refresh(self):
         for thread in self.threads:
             thread.start()
+
+        # connection button check
+        self.connection_thread.start()
 
     def update_row(self, cell_no, data):
         url = 'https://127.0.0.1:8000'
