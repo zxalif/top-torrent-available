@@ -28,7 +28,6 @@ from PyQt5 import QtCore
 
 from PyQt5.QtCore import QEvent, Qt
 from libs.torrent import get_top_movies, get_trending_movies
-from datetime import timedelta, datetime
 from uuid import uuid4
 import qtawesome as qta
 import requests
@@ -40,7 +39,7 @@ try:
 except ImportError:
     DUMMY = []
 
-DEBUG = True
+DEBUG = False
 COUNT_LABEL = 'Count: %d'
 CONNECT_CHECK_INTERVAL = 3600  # (s) - every hour
 PAUSE = False
@@ -264,7 +263,9 @@ class MainWindow(WidgetWindow):
         self.counter_label.setText(label)
 
     def update_screen(self, data, dtype):
-        if not data: return
+        if not data:
+            self.turn_off_progress()
+            return
 
         self._clear_table(dtype=dtype)
 
