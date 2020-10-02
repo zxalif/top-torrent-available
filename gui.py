@@ -16,7 +16,6 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QMessageBox,
     QLabel,
-    QStyle,
 )
 
 from PyQt5.QtGui import (
@@ -241,14 +240,20 @@ class MainWindow(WidgetWindow):
         refresh_button = QPushButton(refresh, "Refresh")
         refresh_button.clicked.connect(self.refresh)
 
+        # progress widget
+        self.progress = QMovieLabel('img/loading.gif')
+        self.progress.setAlignment(Qt.AlignCenter)
+
         # main contents
         self.content = QTableWidget()
         self.content.setColumnCount(len(self.headers))
         self.content.verticalHeader().setVisible(False)
         self.content.setHorizontalHeaderLabels(self.headers)
         self.content.resizeColumnsToContents()
+        self.content.hide()
 
         top_content_layout = QVBoxLayout()
+        top_content_layout.addWidget(self.progress)
         top_content_layout.addWidget(self.content)
 
         bottom_button_layout = QHBoxLayout()
@@ -269,6 +274,8 @@ class MainWindow(WidgetWindow):
 
     # refresh the current window
     def refresh(self):
+        self.content.hide()
+        self.progress.show()
         for thread in self.threads:
             thread.start()
 
@@ -324,6 +331,8 @@ class MainWindow(WidgetWindow):
 
         self.content.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         self.content.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.progress.hide()
+        self.content.show()
 
 
 class Window(QMainWindow):
