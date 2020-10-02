@@ -274,8 +274,7 @@ class MainWindow(WidgetWindow):
 
     # refresh the current window
     def refresh(self):
-        self.content.hide()
-        self.progress.show()
+        self.turn_on_progress()
         for thread in self.threads:
             thread.start()
 
@@ -297,10 +296,16 @@ class MainWindow(WidgetWindow):
         if kwargs.get('force', False):
             while self.content.rowCount() > 0:
                 self.content.removeRow(0)
-        if kwargs.get('dtype') and kwargs.get('previous_rows'):
-            previous_rows = kwargs['previous_rows']
-            for index in range(*previous_rows):
-                self.content.removeRow(index)
+
+        if kwargs.get('dtype'):
+            count = self.content.rowCount()
+            dtype = kwargs['dtype']
+            while count >= 0:
+                value = self.content.item(count, 1)
+                if value and value.text() == dtype:
+                    self.content.removeRow(count)
+                    count = self.content.rowCount()
+                count -= 1
 
     def _update_counter_label(self, count):
         label = str(COUNT_LABEL % count)
@@ -309,18 +314,13 @@ class MainWindow(WidgetWindow):
     def update_screen(self, data, dtype):
         if not data: return
 
-        # remove any previous data related to the dtype
-        mem_cache_key = '{}:{}'.format(dtype, data[0].get('type'))
-        previous_rows = MemCache.get(mem_cache_key, default=(0, 0))
-        self._clear_table(dtype=dtype, previous_rows=previous_rows)
+        self._clear_table(dtype=dtype)
 
         previous_count = self.content.rowCount()
         data_count = len(data)
-        print(data_count, mem_cache_key, previous_rows)
 
         # set the current dtype indexs
         max_length = previous_count + data_count
-        MemCache.update({mem_cache_key: (previous_count, max_length)})
 
         self.content.setRowCount(max_length)
         for i, item in enumerate(data):
@@ -331,8 +331,16 @@ class MainWindow(WidgetWindow):
 
         self.content.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         self.content.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.turn_off_progress()
+
+    def turn_on_progress(self):
+        self.content.hide()
+        self.progress.show()
+
+    def turn_off_progress(self):
         self.progress.hide()
         self.content.show()
+
 
 
 class Window(QMainWindow):
