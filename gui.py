@@ -47,19 +47,8 @@ PAUSE = False
 CHECK_SAFE_SCREEN = True
 
 
-def downloader():
-    return DUMMY
-
-get_top_movies = downloader
-get_trending_movies = downloader
-
-
 def get_uuid_16(length=16):
     return uuid4().hex[:16]
-
-
-def printer(data):
-    print(data)
 
 
 class WorkerThread(QtCore.QThread):
@@ -96,43 +85,6 @@ class ConnectionThread(QtCore.QThread):
                 cfm = False
             self.signal.emit(cfm)
             time.sleep(CONNECT_CHECK_INTERVAL)
-
-
-class MemCache:
-
-    _mem = {}
-
-    @classmethod
-    def update(self, data):
-        MemCache._mem.update(data)
-
-    @classmethod
-    def get(self, key, default=None):
-        return MemCache._mem.get(key, default)
-
-
-class KeepAlive(WorkerThread):
-
-    signal = QtCore.pyqtSignal(object)
-
-    def __init__(self, func, connector, interval=0.1, parent=None, *args, **kwargs):
-        super(KeepAlive, self).__init__(func, parent, *args, **kwargs)
-        self._interval = interval
-        self.connector = connector
-        self._id = get_uuid_16()
-        self._break = False
-
-    def run(self):
-        self._last_check = now = datetime.now()
-
-        if now >= now + timedelta(seconds=self._interval):
-            data = self.func()
-            self.signal.emit(data)
-
-        if not self._break:
-            ka = KeepAlive(self.func, self._interval, self.parent, *self.args, **self.kwargs)
-            ka.signal.connect(self.connector)
-            ka.start()
 
 
 class SystemTrayIcon(QSystemTrayIcon):
@@ -342,7 +294,6 @@ class MainWindow(WidgetWindow):
         self.content.show()
 
 
-
 class Window(QMainWindow):
 
     def __init__(self, parent=None):
@@ -354,9 +305,6 @@ class Window(QMainWindow):
 
         self.setFixedSize(350, 450)
         self.set_to_bottom_right_corner()
-
-        # self.loading = QMovieLabel(fileName='img/loading.gif', parent=self)
-        # self.loading.setAlignment(Qt.AlignCenter)
 
         self.tray_icon = SystemTrayIcon(QtGui.QIcon('img/tray.png'), self)
         self.tray_icon.show()
