@@ -41,19 +41,26 @@ try:
 except ImportError:
     DUMMY = []
 
-DEBUG = False
+DEBUG = True
 COUNT_LABEL = 'Count: %d'
-CONNECT_CHECK_INTERVAL = 300  # (s) - every 5 minute
+CONNECT_CHECK_INTERVAL = 3600  # (s) - every hour
 PAUSE = False
 CHECK_SAFE_SCREEN = True
 
 
-def check_connection():
-    pass
+def downloader():
+    return DUMMY
+
+get_top_movies = downloader
+get_trending_movies = downloader
 
 
 def get_uuid_16(length=16):
     return uuid4().hex[:16]
+
+
+def printer(data):
+    print(data)
 
 
 class WorkerThread(QtCore.QThread):
@@ -230,7 +237,8 @@ class MainWindow(WidgetWindow):
         self.connection.setStyleSheet("background-color: blue")
         self.connection.setToolTip("Internet Connection")
         self.counter_label = QLabel(COUNT_LABEL % 0)
-        refresh_button = QPushButton("Refresh")
+        refresh = qta.icon('fa5.arrow-alt-circle-down')
+        refresh_button = QPushButton(refresh, "Refresh")
         refresh_button.clicked.connect(self.refresh)
 
         # main contents
@@ -282,27 +290,37 @@ class MainWindow(WidgetWindow):
         if kwargs.get('force', False):
             while self.content.rowCount() > 0:
                 self.content.removeRow(0)
-        if kwargs.get('dtype'):
-            dtype = kwargs['dtype']
-            print(dtype)
-            # remote all similler dtype data from table
+        if kwargs.get('dtype') and kwargs.get('previous_rows'):
+            previous_rows = kwargs['previous_rows']
+            for index in range(*previous_rows):
+                self.content.removeRow(index)
 
     def _update_counter_label(self, count):
         label = str(COUNT_LABEL % count)
         self.counter_label.setText(label)
 
     def update_screen(self, data, dtype):
-        self._clear_table(dtype=dtype)
+        if not data: return
+
+        # remove any previous data related to the dtype
+        mem_cache_key = '{}:{}'.format(dtype, data[0].get('type'))
+        previous_rows = MemCache.get(mem_cache_key, default=(0, 0))
+        self._clear_table(dtype=dtype, previous_rows=previous_rows)
+
         previous_count = self.content.rowCount()
         data_count = len(data)
-        self.content.setRowCount(
-            previous_count + data_count
-        )
+        print(data_count, mem_cache_key, previous_rows)
+
+        # set the current dtype indexs
+        max_length = previous_count + data_count
+        MemCache.update({mem_cache_key: (previous_count, max_length)})
+
+        self.content.setRowCount(max_length)
         for i, item in enumerate(data):
             item.update({'dtype': dtype})
             self.update_row(previous_count + i, item)
 
-        self._update_counter_label(previous_count + data_count)
+        self._update_counter_label(max_length)
 
         self.content.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         self.content.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)

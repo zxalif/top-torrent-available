@@ -49,7 +49,3 @@ def get_top_movies():
     response = get_response(TOP_MOVIES)
     soup = bs.BeautifulSoup(response, 'html.parser')
     return extract(soup)
-
-# res = requests.post(
-#     "https://hooks.slack.com/services/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",
-#     json={"text": '```' + "\n".join(data) + '```'}, headers={"Conent-Type": "application/json"})
