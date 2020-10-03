@@ -40,6 +40,8 @@ import qtawesome as qta
 import requests
 import time
 
+from subprocess import Popen, PIPE
+
 
 try:
     from tmp import DATA as DUMMY
@@ -219,6 +221,7 @@ class ContentDetailsWindow(WidgetWindow):
         self.copy_magnet.clicked.connect(self.copy_magnet_url)
         open_icon = qta.icon('fa5s.external-link-square-alt')
         self.open_button = QPushButton(open_icon, "")
+        self.open_button.clicked.connect(self.open_magnet)
 
         bottom_button_layout = QHBoxLayout()
         bottom_button_layout.addWidget(self.back_button)
@@ -237,6 +240,7 @@ class ContentDetailsWindow(WidgetWindow):
     def keyPressEvent(self, event):
         # TODO: terminate other threads brefore quit if running
         if event.key() in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Escape):
+            self._current_magnet = ''
             self.goto('main')
         else:
             super().keyPressEvent(event)
@@ -245,6 +249,10 @@ class ContentDetailsWindow(WidgetWindow):
         cb = QApplication.clipboard()
         cb.clear(mode=cb.Clipboard)
         cb.setText(self._current_magnet, mode=cb.Clipboard)
+
+    def open_magnet(self):
+        if not self._current_magnet: return
+        Popen(['xdg-open "{}"'.format(self._current_magnet)], PIPE, shell=True)
 
     @property
     def current_row_content_url(self):
