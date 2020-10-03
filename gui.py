@@ -49,7 +49,7 @@ try:
 except ImportError:
     DUMMY = []
 
-DEBUG = True
+DEBUG = False
 COUNT_LABEL = 'Count: %d'
 CONNECT_CHECK_INTERVAL = 3600  # (s) - every hour
 PAUSE = False
