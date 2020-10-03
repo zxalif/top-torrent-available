@@ -78,6 +78,7 @@ def get_details(link):
         image = image.find('img')
         if image:
             image = 'https:{}'.format(image['src'])
+    magnet = soup.find(lambda tag: tag and tag.name == 'a' and 'Magnet Download' in tag.text)
     data = dict(
         name=name,
         se=se,
@@ -88,6 +89,7 @@ def get_details(link):
         languages=languages,
         size=size,
         image=image,
+        magnet=magnet['href'] if magnet else ''
     )
     return data
 

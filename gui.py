@@ -169,6 +169,7 @@ class ContentDetailsWindow(WidgetWindow):
         self.parent = parent
         self.central_widgets = QWidget()
         self._self_url = None
+        self._current_magnet = ''
         self.initUI()
 
     def initUI(self):
@@ -243,7 +244,7 @@ class ContentDetailsWindow(WidgetWindow):
     def copy_magnet_url(self):
         cb = QApplication.clipboard()
         cb.clear(mode=cb.Clipboard)
-        cb.setText('get_copy magent url', mode=cb.Clipboard)
+        cb.setText(self._current_magnet, mode=cb.Clipboard)
 
     @property
     def current_row_content_url(self):
@@ -290,6 +291,7 @@ class ContentDetailsWindow(WidgetWindow):
         self.types.setText(FORMAT)
 
     def update_screen(self, data):
+        self._current_magnet = data.get('magnet')
         # try to update image as soon as possible
         self.download_details_thread = DetailDownloadThread(
             download_image,
@@ -310,6 +312,7 @@ class ContentDetailsWindow(WidgetWindow):
         self._update_keywords(data.get('keywords'))
 
     def _clean_screen(self):
+        self._current_magnet = ''
         self._update_thumb(False)
         self._update_title(None, None)
         self._update_se_le(None, None)
