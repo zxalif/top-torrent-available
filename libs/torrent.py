@@ -3,14 +3,15 @@
 import requests
 import bs4 as bs
 
+
 TRENDING_MOVIES = "https://1337x.to/trending/d/movies/"
 TOP_MOVIES = "https://1337x.to/top-100-movies"
 
 
-def get_response(url):
+def get_response(url, raw=False):
     try:
         response = requests.get(url)
-        data = response.text
+        data = response.content if raw else response.text
     except requests.exceptions.ConnectionError:
         data = ''
     return data
@@ -61,13 +62,22 @@ def get_details(link):
     name = soup.find('h3')
     if not name: return {}
     name = name.text
+    if name == 'Code: ':
+        name = soup.find('h1').text
     se = soup.find('span', {'class': 'seeds'}).text
     le = soup.find('span', {'class': 'leeches'}).text
-    keywords = [span.text for span in soup.find('div', {'class': 'torrent-category'}).findAll('span')]
+    keywords = soup.find('div', {'class': 'torrent-category'}) or []
+    if keywords:
+        keywords = [span.text for span in keywords.findAll('span')]
     downloads = soup.find(lambda tag: tag.name == 'li' and 'Downloads' in tag.text).find('span').text
     category = soup.find(lambda tag: tag.name == 'li' and 'Category' in tag.text).find('span').text
     languages = soup.find(lambda tag: tag.name == 'li' and 'Language' in tag.text).find('span').text
     size = soup.find(lambda tag: tag.name == 'li' and 'Total size' in tag.text).find('span').text
+    image = soup.find('div', {'class': 'torrent-image'})
+    if image:
+        image = image.find('img')
+        if image:
+            image = 'https:{}'.format(image['src'])
     data = dict(
         name=name,
         se=se,
@@ -77,5 +87,14 @@ def get_details(link):
         category=category,
         languages=languages,
         size=size,
+        image=image,
     )
     return data
+
+
+def download_image(link):
+    if not link: return False
+    response = get_response(link, raw=True)
+    with open("img/tmp", "wb") as img:
+        img.write(response)
+    return True

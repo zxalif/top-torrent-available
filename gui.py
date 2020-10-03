@@ -30,6 +30,7 @@ from PyQt5 import QtCore
 
 from PyQt5.QtCore import QEvent, Qt
 from libs.torrent import (
+    download_image,
     get_top_movies,
     get_trending_movies,
     get_details,
@@ -176,14 +177,16 @@ class ContentDetailsWindow(WidgetWindow):
     def UIComponents(self):
         # contentents details
         self.image_label = QLabel(self)
-        pixmap = QPixmap('img/icon.jpg')
+        pixmap = QPixmap('img/icon.png')
         self.image_label.setPixmap(pixmap)
 
         # top text details
         text_details = QVBoxLayout()
         self.name_label = QLabel()
+        self.name_label.setWordWrap(True)
         self.se_le = QLabel()
         self.keywords = QLabel()
+        self.keywords.setWordWrap(True)
         self.downloads = QLabel()
         self.languages = QLabel()
         self.category = QLabel()
@@ -226,10 +229,12 @@ class ContentDetailsWindow(WidgetWindow):
         main_box_layout.addLayout(top_content_layout, 1)
         main_box_layout.addWidget(self.lists, 2)
         main_box_layout.addLayout(bottom_button_layout, 3)
+        self._clean_screen()
         self.central_widgets.setLayout(main_box_layout)
         self.setCentralWidget(self.central_widgets)
 
     def keyPressEvent(self, event):
+        # TODO: terminate other threads brefore quit if running
         if event.key() in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Escape):
             self.goto('main')
         else:
@@ -247,18 +252,25 @@ class ContentDetailsWindow(WidgetWindow):
         row_u = row_u.text() if row_u else None
         return self._self_url or row_u
 
+    def _update_thumb(self, clear=False):
+        # as !clear
+        name = 'img/icon.png' if not clear else 'img/tmp'
+        pixmap = QPixmap(name)
+        self.image_label.setPixmap(pixmap)
+
     def _update_title(self, name, size):
         FORMAT = "<u><b>{} ({})</b></u>".format(name, size)
         self.name_label.setText(FORMAT)
+        self.name_label.setToolTip(FORMAT)
 
     def _update_keywords(self, keywords):
-        if not keywords: keywords = []
+        if not keywords: keywords = [None]
         form = '<b style="color: green;">{}</b>'
         FORMAT = [form.format(key) for key in keywords]
         self.keywords.setText(' '.join(FORMAT))
 
     def _update_se_le(self, se, le):
-        FORMAT = 'SE/LE: <b style="color: green;">{}</b>/<b style="color: red;">{}</b>'
+        FORMAT = 'SE/LE: <b style="color: green;">{}</b>/<b style="color: red;">{}</b>'.format(se, le)
         self.se_le.setText(FORMAT)
 
     def _update_downloads(self, count):
@@ -266,7 +278,7 @@ class ContentDetailsWindow(WidgetWindow):
         self.downloads.setText(FORMAT)
 
     def _update_language(self, lang):
-        FORMAT = 'LANGUAGES: {}'.format(lang.title())
+        FORMAT = 'LANGUAGES: {}'.format(lang)
         self.languages.setText(FORMAT)
 
     def _update_category(self, category):
@@ -278,16 +290,37 @@ class ContentDetailsWindow(WidgetWindow):
         self.types.setText(FORMAT)
 
     def update_screen(self, data):
+        # try to update image as soon as possible
+        self.download_details_thread = DetailDownloadThread(
+            download_image,
+            url=data.get('image')
+        )
+        self.download_details_thread.job_done.connect(self._update_thumb)
+        self.download_details_thread.start()
+
         self._update_title(
             data.get('name'), data.get('size')
+        )
+        self._update_se_le(
+            data.get('se'), data.get('le')
         )
         self._update_category(data.get('category'))
         self._update_downloads(data.get('downloads'))
         self._update_language(data.get('languages', '-'))
         self._update_keywords(data.get('keywords'))
-        self._update_keywords(data.get('keywords'))
+
+    def _clean_screen(self):
+        self._update_thumb(False)
+        self._update_title(None, None)
+        self._update_se_le(None, None)
+        self._update_category(None)
+        self._update_downloads(None)
+        self._update_language(None)
+        self._update_keywords(None)
 
     def on_load(self, **kwargs):
+        # TODO: terminate other threads if running
+        self._clean_screen()
         self.download_details_thread = DetailDownloadThread(get_details, url=self.current_row_content_url)
         self.download_details_thread.job_done.connect(self.update_screen)
         self.download_details_thread.start()
