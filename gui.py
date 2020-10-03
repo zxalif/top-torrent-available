@@ -301,7 +301,7 @@ class TableContentWidget(QTableWidget):
 
     def keyPressEvent(self, event):
         # pretttty close both keys
-        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Return) and self.currentRow() > 0:
+        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Return) and self.currentRow() >= 0:
             self.parent.goto('details')
         else:
             super().keyPressEvent(event)
