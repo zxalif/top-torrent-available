@@ -21,7 +21,7 @@ def extract(soup):
     data = []
     for tr in trs:
         name = tr.find('td', {'class': 'name'})
-        url = name.find('a')['href']
+        url = name.findAll('a')[-1]['href']
         name = name.text.split('\n')[-1]
         size = tr.find('td', {'class': 'size'}).text
         seeds = tr.find('td', {'class': 'seeds'}).text
@@ -51,3 +51,31 @@ def get_top_movies():
     response = get_response(TOP_MOVIES)
     soup = bs.BeautifulSoup(response, 'html.parser')
     return extract(soup)
+
+
+def get_details(link):
+    if not link: return {}
+    url = 'https://1337x.to{}'.format(link)
+    respone = get_response(url)
+    soup = bs.BeautifulSoup(respone, 'html.parser')
+    name = soup.find('h3')
+    if not name: return {}
+    name = name.text
+    se = soup.find('span', {'class': 'seeds'}).text
+    le = soup.find('span', {'class': 'leeches'}).text
+    keywords = [span.text for span in soup.find('div', {'class': 'torrent-category'}).findAll('span')]
+    downloads = soup.find(lambda tag: tag.name == 'li' and 'Downloads' in tag.text).find('span').text
+    category = soup.find(lambda tag: tag.name == 'li' and 'Category' in tag.text).find('span').text
+    languages = soup.find(lambda tag: tag.name == 'li' and 'Language' in tag.text).find('span').text
+    size = soup.find(lambda tag: tag.name == 'li' and 'Total size' in tag.text).find('span').text
+    data = dict(
+        name=name,
+        se=se,
+        le=le,
+        keywords=keywords,
+        downloads=downloads,
+        category=category,
+        languages=languages,
+        size=size,
+    )
+    return data

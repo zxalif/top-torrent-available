@@ -16,10 +16,12 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QMessageBox,
     QLabel,
+    QListWidget,
 )
 
 from PyQt5.QtGui import (
     QFont,
+    QPixmap,
 )
 
 from PyQt5 import QtWidgets
@@ -27,7 +29,11 @@ from PyQt5 import QtGui
 from PyQt5 import QtCore
 
 from PyQt5.QtCore import QEvent, Qt
-from libs.torrent import get_top_movies, get_trending_movies
+from libs.torrent import (
+    get_top_movies,
+    get_trending_movies,
+    get_details,
+)
 from uuid import uuid4
 import qtawesome as qta
 import requests
@@ -77,6 +83,15 @@ class DownloadThread(WorkerThread):
         data = self.func()
         dtype = self.kwargs.get('dtype', '-')
         self.job_done.emit(data, dtype)
+
+
+class DetailDownloadThread(WorkerThread):
+    job_done = QtCore.pyqtSignal(object)
+
+    def run(self):
+        url = self.kwargs['url']
+        data = self.func(url)
+        self.job_done.emit(data)
 
 
 class ConnectionThread(QtCore.QThread):
@@ -152,16 +167,52 @@ class ContentDetailsWindow(WidgetWindow):
         super(WidgetWindow, self).__init__(parent)
         self.parent = parent
         self.central_widgets = QWidget()
-        self.setWindowTitle('+?')
+        self._self_url = None
+        self.initUI()
+
+    def initUI(self):
         self.UIComponents()
 
     def UIComponents(self):
+        # contentents details
+        self.image_label = QLabel(self)
+        pixmap = QPixmap('img/icon.jpg')
+        self.image_label.setPixmap(pixmap)
+
+        # top text details
+        text_details = QVBoxLayout()
+        self.name_label = QLabel()
+        self.se_le = QLabel()
+        self.keywords = QLabel()
+        self.downloads = QLabel()
+        self.languages = QLabel()
+        self.category = QLabel()
+        self.types = QLabel()
+
+        text_details.addWidget(self.name_label)
+        text_details.addWidget(self.keywords)
+        text_details.addWidget(self.category)
+        text_details.addWidget(self.se_le)
+        text_details.addWidget(self.downloads)
+        text_details.addWidget(self.languages)
+        text_details.addWidget(self.types)
+
+        top_content_layout = QHBoxLayout()
+        top_content_layout.addWidget(self.image_label)
+        top_content_layout.addLayout(text_details)
+        text_details.addStretch(1)
+
+        # content related list
+        self.lists = QListWidget()
+
+        # main bottom lines
         back_icon = qta.icon('fa5.arrow-alt-circle-left')
         self.back_button = QPushButton(back_icon, "")
         self.back_button.clicked.connect(lambda: self.goto('main'))
 
         copy_icon = qta.icon('fa5.copy')
         self.copy_magnet = QPushButton(copy_icon, "")
+        self.copy_magnet.clicked.connect(self.copy_magnet_url)
         open_icon = qta.icon('fa5s.external-link-square-alt')
         self.open_button = QPushButton(open_icon, "")
 
@@ -172,8 +223,9 @@ class ContentDetailsWindow(WidgetWindow):
         bottom_button_layout.addWidget(self.open_button)
 
         main_box_layout = QVBoxLayout()
-        main_box_layout.addStretch(1)
-        main_box_layout.addLayout(bottom_button_layout, 1)
+        main_box_layout.addLayout(top_content_layout, 1)
+        main_box_layout.addWidget(self.lists, 2)
+        main_box_layout.addLayout(bottom_button_layout, 3)
         self.central_widgets.setLayout(main_box_layout)
         self.setCentralWidget(self.central_widgets)
 
@@ -182,6 +234,64 @@ class ContentDetailsWindow(WidgetWindow):
             self.goto('main')
         else:
             super().keyPressEvent(event)
+
+    def copy_magnet_url(self):
+        cb = QApplication.clipboard()
+        cb.clear(mode=cb.Clipboard)
+        cb.setText('get_copy magent url', mode=cb.Clipboard)
+
+    @property
+    def current_row_content_url(self):
+        row = self.parent.content.currentRow()
+        row_u = self.parent.content.item(row, 7)
+        row_u = row_u.text() if row_u else None
+        return self._self_url or row_u
+
+    def _update_title(self, name, size):
+        FORMAT = "<u><b>{} ({})</b></u>".format(name, size)
+        self.name_label.setText(FORMAT)
+
+    def _update_keywords(self, keywords):
+        if not keywords: keywords = []
+        form = '<b style="color: green;">{}</b>'
+        FORMAT = [form.format(key) for key in keywords]
+        self.keywords.setText(' '.join(FORMAT))
+
+    def _update_se_le(self, se, le):
+        FORMAT = 'SE/LE: <b style="color: green;">{}</b>/<b style="color: red;">{}</b>'
+        self.se_le.setText(FORMAT)
+
+    def _update_downloads(self, count):
+        FORMAT = 'DOWNLOADS: <b style="color: green;">{}</b>'.format(count)
+        self.downloads.setText(FORMAT)
+
+    def _update_language(self, lang):
+        FORMAT = 'LANGUAGES: {}'.format(lang.title())
+        self.languages.setText(FORMAT)
+
+    def _update_category(self, category):
+        FORMAT = 'CATEGORY: {}'.format(category)
+        self.category.setText(FORMAT)
+
+    def _update_types(self, types):
+        FORMAT = 'TYPE: {}'.format(types)
+        self.types.setText(FORMAT)
+
+    def update_screen(self, data):
+        self._update_title(
+            data.get('name'), data.get('size')
+        )
+        self._update_category(data.get('category'))
+        self._update_downloads(data.get('downloads'))
+        self._update_language(data.get('languages', '-'))
+        self._update_keywords(data.get('keywords'))
+        self._update_keywords(data.get('keywords'))
+
+    def on_load(self, **kwargs):
+        print(kwargs, self.current_row_content_url)
+        self.download_details_thread = DetailDownloadThread(get_details, url=self.current_row_content_url)
+        self.download_details_thread.job_done.connect(self.update_screen)
+        self.download_details_thread.start()
 
 
 class TableContentWidget(QTableWidget):
@@ -216,8 +326,8 @@ class MainWindow(WidgetWindow):
         'top': get_top_movies,
     }
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
         # download thread
         self.threads = [DownloadThread(func, dtype=dtype) for dtype, func in self.thread_safe_func.items()]
@@ -377,7 +487,7 @@ class Window(QMainWindow):
         self.setFont(QFont('Courier', 9))
 
         # register all widgets
-        self.register(MainWindow())
+        self.register(MainWindow(self))
         self.register(ContentDetailsWindow(self))
 
         self.goto('main')
@@ -400,6 +510,7 @@ class Window(QMainWindow):
     def goto(self, name):
         if name in self.frames:
             widget = self.frames[name]
+            if name == 'details': widget.on_load()
             self.stacked_widget.setCurrentWidget(widget)
 
     # on change Event (minimized/maximized)
