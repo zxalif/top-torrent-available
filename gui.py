@@ -288,7 +288,6 @@ class ContentDetailsWindow(WidgetWindow):
         self._update_keywords(data.get('keywords'))
 
     def on_load(self, **kwargs):
-        print(kwargs, self.current_row_content_url)
         self.download_details_thread = DetailDownloadThread(get_details, url=self.current_row_content_url)
         self.download_details_thread.job_done.connect(self.update_screen)
         self.download_details_thread.start()
@@ -302,7 +301,7 @@ class TableContentWidget(QTableWidget):
 
     def keyPressEvent(self, event):
         # pretttty close both keys
-        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Return):
+        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Return) and self.currentRow() > 0:
             self.parent.goto('details')
         else:
             super().keyPressEvent(event)
