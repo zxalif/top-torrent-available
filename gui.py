@@ -31,6 +31,7 @@ from PyQt5 import QtCore
 from PyQt5.QtCore import QEvent, Qt
 from libs.torrent import (
     download_image,
+    download_related,
     get_top_movies,
     get_trending_movies,
     get_details,
@@ -298,6 +299,17 @@ class ContentDetailsWindow(WidgetWindow):
         FORMAT = 'TYPE: {}'.format(types)
         self.types.setText(FORMAT)
 
+    def _update_lists(self, data):
+        for i, item in enumerate(data):
+            self.lists.addItem(
+                '{} ({}) - ({}/{})'.format(
+                    item.get('name'),
+                    item.get('size'),
+                    item.get('se'),
+                    item.get('le'),
+                )
+            )
+
     def update_screen(self, data):
         self._current_magnet = data.get('magnet')
         # try to update image as soon as possible
@@ -319,7 +331,16 @@ class ContentDetailsWindow(WidgetWindow):
         self._update_language(data.get('languages', '-'))
         self._update_keywords(data.get('keywords'))
 
+        # related movies if has
+        self.download_related_thread = DetailDownloadThread(
+            download_related,
+            url=data.get('has_related')
+        )
+        self.download_related_thread.job_done.connect(self._update_lists)
+        self.download_related_thread.start()
+
     def _clean_screen(self):
+        self.lists.clear()
         self._current_magnet = ''
         self._update_thumb(False)
         self._update_title(None, None)

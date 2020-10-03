@@ -54,16 +54,28 @@ def get_top_movies():
     return extract(soup)
 
 
+def download_related(link):
+    if not link: return {}
+    url = 'https://1337x.to{}'.format(link)
+    respone = get_response(url)
+    soup = bs.BeautifulSoup(respone, 'html.parser')
+    return extract(soup)
+
+
 def get_details(link):
     if not link: return {}
     url = 'https://1337x.to{}'.format(link)
     respone = get_response(url)
     soup = bs.BeautifulSoup(respone, 'html.parser')
-    name = soup.find('h3')
-    if not name: return {}
-    name = name.text
+    _name = soup.find('h3')
+    if not _name: return {}
+    name = _name.text
+    has_related = None
     if name == 'Code: ':
         name = soup.find('h1').text
+    else:
+        has_related = _name.find('a')
+        has_related = has_related['href'] if has_related else None
     se = soup.find('span', {'class': 'seeds'}).text
     le = soup.find('span', {'class': 'leeches'}).text
     keywords = soup.find('div', {'class': 'torrent-category'}) or []
@@ -89,7 +101,8 @@ def get_details(link):
         languages=languages,
         size=size,
         image=image,
-        magnet=magnet['href'] if magnet else ''
+        magnet=magnet['href'] if magnet else '',
+        has_related=has_related,
     )
     return data
 
