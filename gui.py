@@ -90,13 +90,11 @@ class WidgetWindow(QtWidgets.QMainWindow):
         self.gotoSignal.emit(name)
 
 
-class ContentDetailsWindow(WidgetWindow):
-    windowName = 'details'
+class ContentDetailsWidget(QWidget):
 
-    def __init__(self, parent=None):
-        super(WidgetWindow, self).__init__(parent)
+    def __init__(self, parent=None, **kwargs):
+        super(ContentDetailsWidget, self).__init__()
         self.parent = parent
-        self.central_widgets = QWidget()
         self._self_url = None
         self._current_magnet = ''
         self.initUI()
@@ -105,6 +103,7 @@ class ContentDetailsWindow(WidgetWindow):
         self.UIComponents()
 
     def UIComponents(self):
+
         # contentents details
         self.image_label = QLabel(self)
         pixmap = QPixmap(
@@ -143,7 +142,7 @@ class ContentDetailsWindow(WidgetWindow):
         # main bottom lines
         back_icon = qta.icon('fa5.arrow-alt-circle-left')
         self.back_button = QPushButton(back_icon, "")
-        self.back_button.clicked.connect(lambda: self.goto('main'))
+        self.back_button.clicked.connect(lambda: self.parent.goto('main'))
 
         copy_icon = qta.icon('fa5.copy')
         self.copy_magnet = QPushButton(copy_icon, "")
@@ -163,16 +162,7 @@ class ContentDetailsWindow(WidgetWindow):
         main_box_layout.addWidget(self.lists, 2)
         main_box_layout.addLayout(bottom_button_layout, 3)
         self._clean_screen()
-        self.central_widgets.setLayout(main_box_layout)
-        self.setCentralWidget(self.central_widgets)
-
-    def keyPressEvent(self, event):
-        # TODO: terminate other threads brefore quit if running
-        if event.key() in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Escape):
-            self._current_magnet = ''
-            self.goto('main')
-        else:
-            super().keyPressEvent(event)
+        self.setLayout(main_box_layout)
 
     def copy_magnet_url(self):
         cb = QApplication.clipboard()
@@ -183,7 +173,6 @@ class ContentDetailsWindow(WidgetWindow):
         if not self._current_magnet: return
         Popen(['xdg-open "{}"'.format(self._current_magnet)], PIPE, shell=True)
 
-    @property
     def current_row_content_url(self):
         row = self.parent.content.currentRow()
         row_u = self.parent.content.item(row, 7)
@@ -283,9 +272,34 @@ class ContentDetailsWindow(WidgetWindow):
     def on_load(self, **kwargs):
         # TODO: terminate other threads if running
         self._clean_screen()
-        self.download_details_thread = DetailDownloadThread(get_details, url=self.current_row_content_url)
+        self.download_details_thread = DetailDownloadThread(get_details, url=self.current_row_content_url())
         self.download_details_thread.job_done.connect(self.update_screen)
         self.download_details_thread.start()
+
+
+class ContentDetailsWindow(WidgetWindow):
+    windowName = 'details'
+
+    def __init__(self, parent=None):
+        super(WidgetWindow, self).__init__(parent)
+        self.parent = parent
+        self.central_widgets = ContentDetailsWidget(self.parent)
+        self.initUI()
+
+    def initUI(self):
+        self.setCentralWidget(self.central_widgets)
+
+    def keyPressEvent(self, event):
+        # TODO: terminate other threads brefore quit if running
+        if event.key() in (QtCore.Qt.Key_Backspace, QtCore.Qt.Key_Escape):
+            self.central_widgets._current_magnet = '-'
+            self.goto('main')
+        else:
+            super().keyPressEvent(event)
+
+    def on_load(self, **kwargs):
+        # TODO: terminate other threads if running
+        self.central_widgets.on_load()
 
 
 class MainWindow(WidgetWindow):
