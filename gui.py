@@ -6,7 +6,6 @@ from PyQt5.QtWidgets import QApplication
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtWidgets import (
     QDesktopWidget,
-    QTableWidget,
     QTableWidgetItem,
     QPushButton,
     QHBoxLayout,
@@ -42,14 +41,19 @@ from libs.qthread import (
     DetailDownloadThread,
 )
 
+from libs.qwidgets import (
+    QMovieLabel,
+    TableContentWidget,
+)
+
+from utils import build_absolute_path
+
 from libs.tray import SystemTrayIcon
 
 from uuid import uuid4
 import qtawesome as qta
 
 from subprocess import Popen, PIPE
-
-import os
 
 
 try:
@@ -71,33 +75,12 @@ def get_uuid_16(length=16):
     return uuid4().hex[:16]
 
 
-def build_absolute_path(path):
-    return os.path.join(
-        os.getcwd(),
-        path,
-    )
-
-
 def set_to_bottom_right_corner(self):
     ag = QDesktopWidget().availableGeometry()
     # sg = QDesktopWidget().screenGeometry()
     x = ag.width()
     y = ag.height()
     self.move(x, y)
-
-
-class QMovieLabel(QtWidgets.QLabel):
-    def __init__(self, fileName, parent=None):
-        super(QMovieLabel, self).__init__(parent)
-        m = QtGui.QMovie(fileName)
-        self.setMovie(m)
-        m.start()
-
-    def setMovie(self, movie):
-        super(QMovieLabel, self).setMovie(movie)
-        s = movie.currentImage().size()
-        self._movieWidth = s.width()
-        self._movieHeight = s.height()
 
 
 class WidgetWindow(QtWidgets.QMainWindow):
@@ -303,20 +286,6 @@ class ContentDetailsWindow(WidgetWindow):
         self.download_details_thread = DetailDownloadThread(get_details, url=self.current_row_content_url)
         self.download_details_thread.job_done.connect(self.update_screen)
         self.download_details_thread.start()
-
-
-class TableContentWidget(QTableWidget):
-
-    def __init__(self, parent=None):
-        super(TableContentWidget, self).__init__()
-        self.parent = parent
-
-    def keyPressEvent(self, event):
-        # pretttty close both keys
-        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Return) and self.currentRow() >= 0:
-            self.parent.goto('details')
-        else:
-            super().keyPressEvent(event)
 
 
 class MainWindow(WidgetWindow):
