@@ -1,7 +1,7 @@
 #!/usr/bin/python3.6
 
 import sys
-from PyQt5.QtWidgets import QSystemTrayIcon, QApplication
+from PyQt5.QtWidgets import QApplication
 
 from PyQt5.QtWidgets import QMainWindow
 from PyQt5.QtWidgets import (
@@ -14,7 +14,6 @@ from PyQt5.QtWidgets import (
     QWidget,
     QAbstractScrollArea,
     QHeaderView,
-    QMessageBox,
     QLabel,
     QListWidget,
 )
@@ -42,6 +41,8 @@ from libs.qthread import (
     DownloadThread,
     DetailDownloadThread,
 )
+
+from libs.tray import SystemTrayIcon
 
 from uuid import uuid4
 import qtawesome as qta
@@ -83,33 +84,6 @@ def set_to_bottom_right_corner(self):
     x = ag.width()
     y = ag.height()
     self.move(x, y)
-
-
-class SystemTrayIcon(QSystemTrayIcon):
-
-    def __init__(self, icon, parent=None):
-        super(SystemTrayIcon, self).__init__(icon, parent)
-        self.parent = parent
-        menu = QtWidgets.QMenu(parent)
-        show = menu.addAction("Show")
-        exitAction = menu.addAction("Exit")
-        show.triggered.connect(self._show)
-        exitAction.triggered.connect(self.closeVisibleWindow)
-        self.setContextMenu(menu)
-
-    def _show(self):
-        self.parent.show()
-        self.parent.raise_()
-        self.parent.activateWindow()
-
-    def closeVisibleWindow(self):
-
-        qm = QMessageBox
-        ret = qm.question(self.parent,
-                          '?', "Are you sure, you want to exist?", qm.Yes | qm.No)
-        if ret != qm.No:
-            self.parent.fromTray = True
-            self.parent.close()
 
 
 class QMovieLabel(QtWidgets.QLabel):
