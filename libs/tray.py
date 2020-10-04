@@ -14,6 +14,7 @@ class SystemTrayIcon(QtWidgets.QSystemTrayIcon):
         self.setContextMenu(menu)
 
     def _show(self):
+        self.parent.setFocus(True)
         self.parent.show()
         self.parent.raise_()
         self.parent.activateWindow()
