@@ -14,7 +14,6 @@ from PyQt5.QtWidgets import (
     QAbstractScrollArea,
     QHeaderView,
     QLabel,
-    QListWidget,
 )
 
 from PyQt5.QtGui import (
@@ -187,11 +186,17 @@ class ContentDetailsWidget(QWidget):
     def current_row_content_url(self):
         if self.parent:
             row = self.parent.content.currentRow()
-            row_u = self.parent.content.item(row, 7)
-            row_u = row_u.text() if row_u else None
+            row_u = self.current_row_content_url_at(row)
         else:
             row_u = None
         return self._self_url or row_u
+
+    def current_row_content_url_at(self, index):
+        row_u = None
+        if self.parent:
+            row_u = self.parent.content.item(index, 7)
+            row_u = row_u.text() if row_u else None
+        return row_u
 
     def _update_thumb(self, clear=False):
         # as !clear
@@ -290,14 +295,32 @@ class ContentDetailsWidget(QWidget):
 
     def on_load(self, **kwargs):
         # TODO: terminate other threads if running
+        url = kwargs.get('load_url') or self.current_row_content_url()
         self._clean_screen()
-        self.download_details_thread = DetailDownloadThread(get_details, url=self.current_row_content_url())
+        self.download_details_thread = DetailDownloadThread(get_details, url=url)
         self.download_details_thread.job_done.connect(self.update_screen)
         self.download_details_thread.start()
+
+    def set_item_selected(self, row):
+        self.parent.content.selectRow(row)
 
     def keyPressEvent(self, event):
         if event.key() in (QtCore.Qt.Key_Escape, QtCore.Qt.Key_Backspace) and self._self_url:
             self.close()
+        elif event.key() == QtCore.Qt.Key_Left and self.parent and not self._self_url:
+            max_row = self.parent.content.rowCount()
+            if max_row > 0 and self.parent.content.currentRow() != 0:
+                _row = self.parent.content.currentRow() - 1
+                load_url = self.current_row_content_url_at(_row)
+                self.on_load(load_url=load_url)
+                self.set_item_selected(_row)
+        elif event.key() == QtCore.Qt.Key_Right and not self._self_url:
+            max_row = self.parent.content.rowCount()
+            if max_row > 0 and self.parent.content.currentRow() != self.parent.content.rowCount() - 1:
+                _row = self.parent.content.currentRow() + 1
+                load_url = self.current_row_content_url_at(_row)
+                self.on_load(load_url=load_url)
+                self.set_item_selected(_row)
         else:
             super().keyPressEvent(event)
 
