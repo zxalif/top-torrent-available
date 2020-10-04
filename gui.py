@@ -43,6 +43,7 @@ from libs.qthread import (
 
 from libs.qwidgets import (
     QMovieLabel,
+    RelatedListWidget,
     TableContentWidget,
 )
 
@@ -91,11 +92,16 @@ class WidgetWindow(QtWidgets.QMainWindow):
 
 
 class ContentDetailsWidget(QWidget):
+    set_to_bottom_right_corner = set_to_bottom_right_corner
 
     def __init__(self, parent=None, **kwargs):
         super(ContentDetailsWidget, self).__init__()
         self.parent = parent
-        self._self_url = None
+        self._self_url = kwargs.get('self_url', None)
+        if self._self_url:
+            self.setWindowFlag(Qt.WindowMinimizeButtonHint, False)
+            self.setFixedSize(*SIZE)
+            self.set_to_bottom_right_corner()
         self._current_magnet = ''
         self.initUI()
 
@@ -137,7 +143,10 @@ class ContentDetailsWidget(QWidget):
         text_details.addStretch(1)
 
         # content related list
-        self.lists = QListWidget()
+        self.lists = RelatedListWidget(
+            self.parent,
+            ContentDetailsWidget if not self._self_url else None
+        )
 
         # main bottom lines
         back_icon = qta.icon('fa5.arrow-alt-circle-left')
@@ -174,9 +183,12 @@ class ContentDetailsWidget(QWidget):
         Popen(['xdg-open "{}"'.format(self._current_magnet)], PIPE, shell=True)
 
     def current_row_content_url(self):
-        row = self.parent.content.currentRow()
-        row_u = self.parent.content.item(row, 7)
-        row_u = row_u.text() if row_u else None
+        if self.parent:
+            row = self.parent.content.currentRow()
+            row_u = self.parent.content.item(row, 7)
+            row_u = row_u.text() if row_u else None
+        else:
+            row_u = None
         return self._self_url or row_u
 
     def _update_thumb(self, clear=False):
@@ -191,6 +203,8 @@ class ContentDetailsWidget(QWidget):
         FORMAT = "<u><b>{} ({})</b></u>".format(name, size)
         self.name_label.setText(FORMAT)
         self.name_label.setToolTip(FORMAT)
+        if self._self_url:
+            self.setWindowTitle('{} ({})'.format(name, size))
 
     def _update_keywords(self, keywords):
         if not keywords: keywords = [None]
@@ -219,6 +233,7 @@ class ContentDetailsWidget(QWidget):
         self.types.setText(FORMAT)
 
     def _update_lists(self, data):
+        self.lists.data = data
         for i, item in enumerate(data):
             self.lists.addItem(
                 '{} ({}) - ({}/{})'.format(
@@ -259,6 +274,7 @@ class ContentDetailsWidget(QWidget):
         self.download_related_thread.start()
 
     def _clean_screen(self):
+        self.lists.data = []
         self.lists.clear()
         self._current_magnet = ''
         self._update_thumb(False)

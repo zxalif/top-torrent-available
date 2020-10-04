@@ -25,7 +25,26 @@ class TableContentWidget(QtWidgets.QTableWidget):
 
     def keyPressEvent(self, event):
         # pretttty close both keys
-        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Return) and self.currentRow() >= 0:
+        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Return):
             self.parent.goto('details')
+        else:
+            super().keyPressEvent(event)
+
+
+class RelatedListWidget(QtWidgets.QListWidget):
+    def __init__(self, parent=None, widget=None):
+        super(RelatedListWidget, self).__init__()
+        self.parent = parent
+        self._widget = widget
+        self.data = []
+
+    def keyPressEvent(self, event):
+        # pretttty close both keys
+        if event.key() in (QtCore.Qt.Key_Shift, QtCore.Qt.Key_Return) and self.data and self._widget:
+            row = self.currentRow()
+            _data = self.data[row]
+            widget = self._widget(self_url=_data.get('url'))
+            widget.on_load()
+            widget.show()
         else:
             super().keyPressEvent(event)
