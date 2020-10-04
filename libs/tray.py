@@ -1,4 +1,5 @@
 from PyQt5 import QtWidgets
+from PyQt5 import QtCore
 
 
 class SystemTrayIcon(QtWidgets.QSystemTrayIcon):
@@ -14,6 +15,8 @@ class SystemTrayIcon(QtWidgets.QSystemTrayIcon):
         self.setContextMenu(menu)
 
     def _show(self):
+        # fix for windows bring back
+        self.parent.setWindowFlag(QtCore.Qt.WindowStaysOnTopHint)
         self.parent.setFocus(True)
         self.parent.show()
         self.parent.raise_()
