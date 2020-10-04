@@ -102,6 +102,7 @@ class ContentDetailsWidget(QWidget):
             self.setWindowFlag(Qt.WindowMinimizeButtonHint, False)
             self.setFixedSize(*SIZE)
             self.set_to_bottom_right_corner()
+            self.setFont(QFont('Courier', 9))
         self._current_magnet = ''
         self.initUI()
 
@@ -151,7 +152,8 @@ class ContentDetailsWidget(QWidget):
         # main bottom lines
         back_icon = qta.icon('fa5.arrow-alt-circle-left')
         self.back_button = QPushButton(back_icon, "")
-        self.back_button.clicked.connect(lambda: self.parent.goto('main'))
+        # close if self url
+        self.back_button.clicked.connect(lambda: self.close() if self._self_url else self.parent.goto('main'))
 
         copy_icon = qta.icon('fa5.copy')
         self.copy_magnet = QPushButton(copy_icon, "")
@@ -265,13 +267,14 @@ class ContentDetailsWidget(QWidget):
         self._update_language(data.get('languages', '-'))
         self._update_keywords(data.get('keywords'))
 
-        # related movies if has
-        self.download_related_thread = DetailDownloadThread(
-            download_related,
-            url=data.get('has_related')
-        )
-        self.download_related_thread.job_done.connect(self._update_lists)
-        self.download_related_thread.start()
+        # already downloaded previously
+        if not self._self_url:
+            self.download_related_thread = DetailDownloadThread(
+                download_related,
+                url=data.get('has_related')
+            )
+            self.download_related_thread.job_done.connect(self._update_lists)
+            self.download_related_thread.start()
 
     def _clean_screen(self):
         self.lists.data = []
@@ -291,6 +294,12 @@ class ContentDetailsWidget(QWidget):
         self.download_details_thread = DetailDownloadThread(get_details, url=self.current_row_content_url())
         self.download_details_thread.job_done.connect(self.update_screen)
         self.download_details_thread.start()
+
+    def keyPressEvent(self, event):
+        if event.key() in (QtCore.Qt.Key_Escape, QtCore.Qt.Key_Backspace) and self._self_url:
+            self.close()
+        else:
+            super().keyPressEvent(event)
 
 
 class ContentDetailsWindow(WidgetWindow):
