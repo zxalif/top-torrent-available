@@ -43,6 +43,8 @@ import time
 
 from subprocess import Popen, PIPE
 
+import os
+
 
 try:
     from tmp import DATA as DUMMY
@@ -61,6 +63,13 @@ SIZE = (WIDTH, HEIGHT)
 
 def get_uuid_16(length=16):
     return uuid4().hex[:16]
+
+
+def build_absolute_path(path):
+    return os.path.join(
+        os.getcwd(),
+        path,
+    )
 
 
 def set_to_bottom_right_corner(self):
@@ -181,7 +190,9 @@ class ContentDetailsWindow(WidgetWindow):
     def UIComponents(self):
         # contentents details
         self.image_label = QLabel(self)
-        pixmap = QPixmap('img/icon.png')
+        pixmap = QPixmap(
+            build_absolute_path('img/icon.png')
+        )
         self.image_label.setPixmap(pixmap)
 
         # top text details
@@ -265,7 +276,9 @@ class ContentDetailsWindow(WidgetWindow):
     def _update_thumb(self, clear=False):
         # as !clear
         name = 'img/icon.png' if not clear else 'img/tmp'
-        pixmap = QPixmap(name)
+        pixmap = QPixmap(
+            build_absolute_path(name)
+        )
         self.image_label.setPixmap(pixmap)
 
     def _update_title(self, name, size):
@@ -428,7 +441,9 @@ class MainWindow(WidgetWindow):
         refresh_button.clicked.connect(self.refresh)
 
         # progress widget
-        self.progress = QMovieLabel('img/loading.gif')
+        self.progress = QMovieLabel(
+            build_absolute_path('img/loading.gif')
+        )
         self.progress.setAlignment(Qt.AlignCenter)
 
         # main contents
@@ -543,7 +558,9 @@ class Window(QMainWindow):
         self.setFixedSize(*SIZE)
         self.set_to_bottom_right_corner()
 
-        self.tray_icon = SystemTrayIcon(QtGui.QIcon('img/tray.png'), self)
+        self.tray_icon = SystemTrayIcon(QtGui.QIcon(
+            build_absolute_path('img/tray.png')
+        ), self)
         self.tray_icon.show()
 
         # system app setup
